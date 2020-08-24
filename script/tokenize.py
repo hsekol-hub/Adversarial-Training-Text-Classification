@@ -8,52 +8,54 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 cwd = os.getcwd()
 print('Working Directory: ', cwd)
-df = pd.read_csv(cwd + '/Imdb/data/processed/imdb_spacy.csv')
+path = cwd + '/Fake News/data'
 
-def encode_labels(row):
-    """
-    Feature encoding for labels
-    :param row: each dataset row
-    :return: label
-    """
-    if row == 'positive':
-        return 1
-    elif row == 'negative':
-        return 0
-    else:
-        return -1
+x_train = np.load(path + '/processed/xtr_shuffled.npy', allow_pickle=True)
+x_test = np.load(path + '/processed/xte_shuffled.npy', allow_pickle=True)
+y_train = np.load(path + '/processed/ytr_shuffled.npy', allow_pickle=True).astype('int')
+y_test = np.load(path + '/processed/yte_shuffled.npy', allow_pickle=True).astype('int')
+unlabelled = np.load(path + '/processed/xun_shuffled.npy', allow_pickle=True)
 
-features = df.review
-labels = np.array(df.sentiment.apply(encode_labels))
 
 MAX_VOCAB_SIZE = 1000000
+MAX_DOC_LENGTH = 100
 
-
+corpus = np.concatenate((x_train, x_test, unlabelled))
 tokenizer = Tokenizer(num_words=MAX_VOCAB_SIZE, oov_token='UNK')
-tokenizer.fit_on_texts(features)
-
-
-encoded_docs = tokenizer.texts_to_sequences(features)
+tokenizer.fit_on_texts(corpus)
 word_index = tokenizer.word_index
 print('Vocabulary size :', len(word_index))
 
-len_list = [len(row) for row in encoded_docs]
+
+def encode(data):
+    data = tokenizer.texts_to_sequences(data)
+    data = pad_sequences(data, padding='post', maxlen=MAX_DOC_LENGTH)
+    return data
+
+x_train = encode(x_train)
+x_test = encode(x_test)
+unlabelled = encode(unlabelled)
+
+encoded_docs = np.concatenate((x_train, x_test, unlabelled))
+
+len_list = [len(row) for row in unlabelled]
+
 print('Mean length of corpus in terms of words: ', np.mean(len_list))
 print('Max length of corpus in terms of words: ', np.max(len_list))
 print('Min length of corpus in terms of words: ', np.min(len_list))
 print('Median length of corpus in terms of words: ', np.median(len_list))
 
-MAX_DOC_LENGTH = 100
 
-features = pad_sequences(encoded_docs, padding='post', maxlen=MAX_DOC_LENGTH)
-
-pickle_out = open(cwd + '/Imdb/data/meta/word_index.pickle','wb')
+pickle_out = open(path + '/meta/word_index.pickle','wb')
 pickle.dump(word_index, pickle_out)
 pickle_out.close()
 
 print('Word Index saved locally')
-np.save(cwd + '/Imdb/data/feature_tokens.npy', features)
-np.save(cwd + '/Imdb/data/label_tokens.npy', labels)
+
+np.save(path + '/temp/x_train.npy', x_train)
+np.save(path + '/temp/x_test.npy', x_test)
+np.save(path + '/temp/unlabelled.npy', unlabelled)
+np.save(path + '/temp/y_train.npy', y_train)
+np.save(path + '/temp/y_test.npy', y_test)
+
 print('Features and labels saved locally in npy format')
-
-
