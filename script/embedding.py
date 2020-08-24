@@ -82,7 +82,7 @@ if __name__ == '__main__':
   cwd = os.getcwd()
   print('Working Directory: ', cwd)
   EMBEDDING_DIM = 300
-  path = cwd + '/Imdb/data/meta'
+  path = cwd + '/Fake News/data/meta'
 
   word_index = load_word_index(path)
   embeddings_index = load_glove(cwd, EMBEDDING_DIM)
@@ -92,6 +92,6 @@ if __name__ == '__main__':
   np.save(path + '/emb_matrix.npy', embedding_matrix)
   print('Embedding matrix saved locally in npy format')
 
-  norm_embedding_matrix, corpus = normalize_embedding(path, embedding_matrix)
-  np.save(path + '/norm_emb_matrix.npy', norm_embedding_matrix)
-  print('Normalised embedding matrix saved locally in npy format at: \n', path)
+  # norm_embedding_matrix, corpus = normalize_embedding(path, embedding_matrix)
+  # np.save(path + '/norm_emb_matrix.npy', norm_embedding_matrix)
+  # print('Normalised embedding matrix saved locally in npy format at: \n', path)
