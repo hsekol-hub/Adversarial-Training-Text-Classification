@@ -111,27 +111,26 @@ def prec_rec_f1_score(model, x, y_true):
                                                                                                                  3)
 
 
-def reports(path, model, ratio, lr, batch_size, activation, n_epoch, epsilon, doc_length, embedding_dim, train_accuracy,
-            test_accuracy,
-            precision_true, precision_fake, recall_true, recall_fake, f1_score_true, f1_score_fake, loss, comment):
+def reports(path, model, K, ratio, lr, batch_size, activation, n_epoch, epsilon, doc_length, embedding_dim,
+            train_accuracy, test_accuracy, precision_true, precision_fake, recall_true, recall_fake, f1_score_true,
+            f1_score_fake, loss, comment):
     time_now = datetime.datetime.now()
     report = pd.DataFrame(
-        columns=['Date', 'Model', 'Ratio (test/train)', 'Learning Rate', 'Batch Size', 'Activation', 'Epochs',
-                 'Epsilon',
-                 'Document Length',
-                 'Embedding dim', 'Train Accuracy', 'Test Accuracy', 'Precision True', 'Precision False',
-                 'Recall True', 'Recall Fake', 'F1 Score True', 'F1 Score Fake', 'Classification Loss', 'Comment'])
+        columns=['Date', 'Model', 'Epsilon', 'Batch Size', 'K Fold', 'Learning Rate', 'Epochs', 'Ratio (test/train)',
+                 'Activation',
+                 'Train Accuracy', 'Test Accuracy', 'Precision True', 'Precision False', 'Recall True', 'Recall Fake',
+                 'F1 Score True',
+                 'F1 Score Fake', 'Classification Loss', 'Comment', 'Document Length', 'Embedding dim', ])
 
     report = report.append({'Date': time_now.strftime("%c"),
                             'Model': model,
-                            'Ratio (test/train)': ratio,
-                            'Learning Rate': lr,
-                            'Batch Size': batch_size,
-                            'Activation': activation,
-                            'Epochs': n_epoch,
                             'Epsilon': epsilon,
-                            'Document Length': doc_length,
-                            'Embedding dim': embedding_dim,
+                            'Batch Size': batch_size,
+                            'K Fold': K,
+                            'Learning Rate': lr,
+                            'Epochs': n_epoch,
+                            'Ratio (test/train)': ratio,
+                            'Activation': activation,
                             'Train Accuracy': train_accuracy,
                             'Test Accuracy': test_accuracy,
                             'Precision True': precision_true,
@@ -141,7 +140,9 @@ def reports(path, model, ratio, lr, batch_size, activation, n_epoch, epsilon, do
                             'F1 Score True': f1_score_true,
                             'F1 Score Fake': f1_score_fake,
                             'Classification Loss': loss,
-                            'Comment': comment}, ignore_index=True)
+                            'Comment': comment,
+                            'Document Length': doc_length,
+                            'Embedding dim': embedding_dim, }, ignore_index=True)
 
     report_path = Path(path + '/Report_VAT.csv')
 
@@ -151,7 +152,6 @@ def reports(path, model, ratio, lr, batch_size, activation, n_epoch, epsilon, do
     else:
         report.to_csv(report_path, mode='w', header=True, index=False)
         print('New Report created')
-
 
 def supervised(lr=0.002, n_epochs=4, model=None, batch_size=32, train_dataset=None, test_dataset=None):
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr, beta_1=0.9, beta_2=0.999, epsilon=1e-07,
@@ -281,74 +281,91 @@ if __name__ == '__main__':
                                                  (x_test.shape, y_test.shape)))
 
     K = 1
-    lr = 0.002
-    n_epochs = 5
+    lr_l = [0.0005, 0.0008, 0.001]
+    n_epochs_l = [10, 20]
     emb_dim = 300
     doc_length = 100
-    batch_size = 32
-    n_splits = 2
-    epsilon = 0.02
+    batch_size_l = [32, 64]
+    n_splits_l = [10, 15]
+    epsilon_l = [0.025, 0.02, 0.015]
     act_fn = 'tanh'
     model_name = 'None'
     #model_type = 'Supervised'
     model_type = 'VAT'
     ratio = str(len(x_test)) + '/' + str(len(x_train))
-    comment = str(n_splits) + ' Fold; Words not found 11820/27644'
+    comment = 'Unknown embeddings for words 11820/27644'
 
-    kf = KFold(n_splits)
-    tr_a_l, te_a_l, p_t_l, p_f_l, r_t_l, r_f_l, f1_t_l, f1_f_l, cl_l = [], [], [], [], [], [], [], [], []
+    for epsilon in epsilon_l:
+        for batch_size in batch_size_l:
+            for n_splits in n_splits_l:
 
-    for train_ind, test_ind in kf.split(X):
-        model = reset_model(act_fn)
-        print('K fold counter: ', K)
-        K += 1
-        x_train, x_test = X[train_ind], X[test_ind]
-        y_train, y_test = Y[train_ind], Y[test_ind]
-        data = [x_train, x_test, y_train, y_test]
-        train_load_batch = len(x_train)
-        test_load_batch = len(x_test)
-        ratio = str(len(x_test)) + '/' + str(len(x_train))
+                for lr in lr_l:
+                    for n_epochs in n_epochs_l:
+                        K = 1
+                        kf = KFold(n_splits)
+                        tr_a_l, te_a_l, p_t_l, p_f_l, r_t_l, r_f_l, f1_t_l, f1_f_l, cl_l = [], [], [], [], [], [], [], [], []
 
-        if model_type == 'Supervised':
-            print('Running Supervised model...')
-            model_name, epsilon = 'Supervised', 'None'
-            train_dataset, test_dataset = convert_tf_data(data, train_load_batch, test_load_batch)
+                        for train_ind, test_ind in kf.split(X):
+                            model = reset_model(act_fn)
+                            print('K fold counter: ', K)
+                            K += 1
+                            x_train, x_test = X[train_ind], X[test_ind]
+                            y_train, y_test = Y[train_ind], Y[test_ind]
+                            data = [x_train, x_test, y_train, y_test]
+                            train_load_batch = len(x_train)
+                            test_load_batch = len(x_test)
+                            ratio = str(len(x_test)) + '/' + str(len(x_train))
 
-            train_accuracy, test_accuracy, precision_true, precision_fake, recall_true, recall_fake, \
-            f1_score_true, f1_score_fake, classification_loss, model = supervised(lr, n_epochs, model, batch_size,
-                                                                                  train_dataset, test_dataset)
+                            if model_type == 'Supervised':
+                                print('Running Supervised model...')
+                                model_name, epsilon = 'Supervised', 'None'
+                                train_dataset, test_dataset = convert_tf_data(data, train_load_batch,
+                                                                              test_load_batch)
 
-        elif model_type == 'VAT':
-            print('Running Virtual Adversarial Training...')
-            model_name = 'VAT'
-            train_dataset, test_dataset = convert_tf_data(data, train_load_batch, test_load_batch)
-            train_accuracy, test_accuracy, precision_true, precision_fake, recall_true, recall_fake, \
-            f1_score_true, f1_score_fake, classification_loss, model = vat(lr, n_epochs, model, act_fn, epsilon,
-                                                                           batch_size,
-                                                                           train_dataset, test_dataset)
-        else:
-            print('Wrong Model Name')
-            break
-        tr_a_l.append(train_accuracy)
-        te_a_l.append(test_accuracy)
-        p_t_l.append(precision_true)
-        p_f_l.append(precision_fake)
-        r_t_l.append(recall_true)
-        r_f_l.append(recall_fake)
-        f1_t_l.append(f1_score_true)
-        f1_f_l.append(f1_score_fake)
-        cl_l.append(classification_loss)
+                                train_accuracy, test_accuracy, precision_true, precision_fake, recall_true, recall_fake, \
+                                f1_score_true, f1_score_fake, classification_loss, model = supervised(lr, n_epochs,
+                                                                                                      model,
+                                                                                                      batch_size,
+                                                                                                      train_dataset,
+                                                                                                      test_dataset)
 
-    train_accuracy = np.mean(tr_a_l)
-    test_accuracy = np.mean(te_a_l)
-    precision_true = np.mean(p_t_l)
-    precision_fake = np.mean(p_f_l)
-    recall_true = np.mean(r_t_l)
-    recall_fake = np.mean(r_f_l)
-    f1_score_true = np.mean(f1_t_l)
-    f1_score_fake = np.mean(f1_f_l)
-    classification_loss = np.mean(cl_l)
+                            elif model_type == 'VAT':
+                                print('Running Virtual Adversarial Training...')
+                                model_name = 'VAT'
+                                train_dataset, test_dataset = convert_tf_data(data, train_load_batch,
+                                                                              test_load_batch)
+                                train_accuracy, test_accuracy, precision_true, precision_fake, recall_true, recall_fake, \
+                                f1_score_true, f1_score_fake, classification_loss, model = vat(lr, n_epochs, model,
+                                                                                               act_fn, epsilon,
+                                                                                               batch_size,
+                                                                                               train_dataset,
+                                                                                               test_dataset)
+                            else:
+                                print('Wrong Model Name')
+                                break
+                            tr_a_l.append(train_accuracy)
+                            te_a_l.append(test_accuracy)
+                            p_t_l.append(precision_true)
+                            p_f_l.append(precision_fake)
+                            r_t_l.append(recall_true)
+                            r_f_l.append(recall_fake)
+                            f1_t_l.append(f1_score_true)
+                            f1_f_l.append(f1_score_fake)
+                            cl_l.append(classification_loss)
 
-    reports(path, model_name, ratio, lr, batch_size, act_fn, n_epochs, epsilon, doc_length, emb_dim,
-            train_accuracy, test_accuracy, precision_true, precision_fake, recall_true, recall_fake,
-            f1_score_true, f1_score_fake, classification_loss, comment)
+                        train_accuracy = np.mean(tr_a_l)
+                        test_accuracy = np.mean(te_a_l)
+                        precision_true = np.mean(p_t_l)
+                        precision_fake = np.mean(p_f_l)
+                        recall_true = np.mean(r_t_l)
+                        recall_fake = np.mean(r_f_l)
+                        f1_score_true = np.mean(f1_t_l)
+                        f1_score_fake = np.mean(f1_f_l)
+                        classification_loss = np.mean(cl_l)
+
+                        reports(path, model_name, n_splits, ratio, lr, batch_size, act_fn, n_epochs, epsilon,
+                                doc_length, emb_dim,
+                                train_accuracy, test_accuracy, precision_true, precision_fake, recall_true,
+                                recall_fake,
+                                f1_score_true, f1_score_fake, classification_loss, comment)
+
